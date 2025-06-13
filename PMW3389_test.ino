@@ -1,4 +1,4 @@
-// PMW3389 Sensor Test with Motion Pin Support (pin 3)
+// PMW3389 Sensor Test with Motion Pin Support (pin 3) and Fixed Motion Latch Clearing
 
 #include <SPI.h>
 #include "pmw3389_firmware.h"  // Include actual firmware definitions
@@ -15,6 +15,7 @@
 #define SROM_ID 0x2A
 #define Resolution_L 0x0E
 #define Resolution_H 0x0F
+#define Motion         0x02  // Motion register to clear interrupt latch
 
 const int ncs = 4;       // Chip select for SPI
 const int motion = 3;    // Motion Trigger (MT) pin from sensor
@@ -81,7 +82,7 @@ void sensor_init() {
   adns_write_reg(Power_Up_Reset, 0x5A);
   delay(50);
 
-  adns_read_reg(0x02);
+  adns_read_reg(Motion);
   adns_read_reg(Delta_X_L);
   adns_read_reg(Delta_X_H);
   adns_read_reg(Delta_Y_L);
@@ -101,9 +102,16 @@ void setup() {
 }
 
 void loop() {
-  // Optionally check motion pin (if used for interrupt-style awareness)
-  bool motionDetected = digitalRead(motion) == HIGH;
-  if (!motionDetected) return; // Skip reading if no motion detected
+
+  delay(500);
+  // Check motion pin
+  bool motionDetected = digitalRead(motion) == LOW;
+ // if (!motionDetected) {
+ //   Serial.println("Movement Not Detected");
+ //   return; // Skip reading if no motion detected
+ // }
+
+  adns_read_reg(Motion); // Clear motion interrupt latch
 
   adns_write_reg(Motion_Burst, 0x00);
   delayMicroseconds(35);
@@ -122,15 +130,15 @@ void loop() {
   int dx = (burst[3] << 8) | burst[2];
   int dy = (burst[5] << 8) | burst[4];
 
-  if (dx != 0 || dy != 0) {
-    Serial.print("Movement: ");
-    if (dy < 0) Serial.print("Forward ");
-    if (dy > 0) Serial.print("Backward ");
-    if (dx < 0) Serial.print("Left ");
-    if (dx > 0) Serial.print("Right ");
-    Serial.print(" | dx: "); Serial.print(dx);
-    Serial.print(", dy: "); Serial.println(dy);
-  }
+  Serial.print("Movement: ");
+  if (dy < 0) Serial.print("Forward ");
+  if (dy > 0) Serial.print("Backward ");
+  if (dx < 0) Serial.print("Left ");
+  if (dx > 0) Serial.print("Right ");
+  Serial.print(" | dx: "); Serial.print(dx);
+  Serial.print(", dy: "); Serial.println(dy);
+  //Serial.print("Motion Byte: "); Serial.println(burst[0], BIN);
+  Serial.print("SQUAL: "); Serial.println(burst[6]);
 
-  delay(50);
+  
 }
